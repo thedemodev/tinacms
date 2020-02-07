@@ -21,6 +21,9 @@ limitations under the License.
  */
 export * from './react-tinacms'
 
+// Media
+export * from './media'
+
 /**
  * The Tina CMS Class
  */
