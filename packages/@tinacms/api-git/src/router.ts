@@ -132,58 +132,102 @@ export function router(config: GitRouterConfig = {}) {
   //       in a cloud editing environment.
   configureGitRemote(REPO_ABSOLUTE_PATH)
 
-  router.delete('/:relPath', (req: any, res: any) => {
-    const user = req.user || {}
-    const fileRelativePath = decodeURIComponent(req.params.relPath)
-    const fileAbsolutePath = path.join(CONTENT_ABSOLUTE_PATH, fileRelativePath)
+  router
+    .route('/file/:relPath')
+    .get((req: any, res: any) => {
+      try {
+        const fileRelativePath = path.posix
+          .join(CONTENT_REL_PATH, req.params.fileRelativePath)
+          .replace(/^\/*/, '')
 
-    try {
-      deleteFile(fileAbsolutePath)
-    } catch {
-      res.status(500).json({ status: 'error', message: GIT_ERROR_MESSAGE })
-    }
+        const content = await show({
+          pathRoot: REPO_ABSOLUTE_PATH,
+          fileRelativePath,
+        })
 
-    commit({
-      pathRoot: REPO_ABSOLUTE_PATH,
-      name: user.name || req.body.name || config.defaultCommitName,
-      email: user.email || req.body.email || config.defaultCommitEmail,
-      message: `Update from Tina: delete ${fileRelativePath}`,
-      push: PUSH_ON_COMMIT,
-      files: [fileAbsolutePath],
-    })
-      .then(() => {
-        res.json({ status: 'success' })
-      })
-      .catch(() => {
-        res.status(500).json({ status: 'error', message: GIT_ERROR_MESSAGE })
-      })
-  })
-
-  router.put('/:relPath', (req: any, res: any) => {
-    const fileRelativePath = decodeURIComponent(req.params.relPath)
-    const fileAbsolutePath = path.join(CONTENT_ABSOLUTE_PATH, fileRelativePath)
-
-    if (DEBUG) {
-      console.log(fileAbsolutePath)
-    }
-    try {
-      const fileIsInRepo = checkFilePathIsInRepo(
-        fileAbsolutePath,
-        CONTENT_ABSOLUTE_PATH
-      )
-      if (fileIsInRepo) {
-        writeFile(fileAbsolutePath, req.body.content)
-      } else {
-        throw new Error(
-          `Failed to write to: ${fileRelativePath} \nCannot write outside of the content directory.`
-        )
+        res.json({
+          fileRelativePath: req.params.fileRelativePath,
+          content,
+          status: 'success',
+        })
+      } catch {
+        res.status(501)
+        res.json({
+          status: 'failure',
+          message: GIT_ERROR_MESSAGE,
+          fileRelativePath: req.params.fileRelativePath,
+        })
       }
-      res.json({ content: req.body.content })
-    } catch {
-      res.status(500).json({ status: 'error', message: GIT_ERROR_MESSAGE })
-    }
-  })
+    })
+    .put((req: any, res: any) => {
+      const fileRelativePath = decodeURIComponent(req.params.relPath)
+      const fileAbsolutePath = path.join(
+        CONTENT_ABSOLUTE_PATH,
+        fileRelativePath
+      )
 
+      if (DEBUG) {
+        console.log(fileAbsolutePath)
+      }
+      try {
+        const fileIsInRepo = checkFilePathIsInRepo(
+          fileAbsolutePath,
+          CONTENT_ABSOLUTE_PATH
+        )
+        if (fileIsInRepo) {
+          writeFile(fileAbsolutePath, req.body.content)
+        } else {
+          throw new Error(
+            `Failed to write to: ${fileRelativePath} \nCannot write outside of the content directory.`
+          )
+        }
+        res.json({ content: req.body.content })
+      } catch {
+        res.status(500).json({ status: 'error', message: GIT_ERROR_MESSAGE })
+      }
+    })
+    .post((req: any, res: any) => {
+      // TODO upload files here?
+    })
+    .delete((req: any, res: any) => {
+      const user = req.user || {}
+      const fileRelativePath = decodeURIComponent(req.params.relPath)
+      const fileAbsolutePath = path.join(
+        CONTENT_ABSOLUTE_PATH,
+        fileRelativePath
+      )
+
+      try {
+        deleteFile(fileAbsolutePath)
+      } catch {
+        res.status(500).json({ status: 'error', message: GIT_ERROR_MESSAGE })
+      }
+
+      commit({
+        pathRoot: REPO_ABSOLUTE_PATH,
+        name: user.name || req.body.name || config.defaultCommitName,
+        email: user.email || req.body.email || config.defaultCommitEmail,
+        message: `Update from Tina: delete ${fileRelativePath}`,
+        push: PUSH_ON_COMMIT,
+        files: [fileAbsolutePath],
+      })
+        .then(() => {
+          res.json({ status: 'success' })
+        })
+        .catch(() => {
+          res.status(500).json({ status: 'error', message: GIT_ERROR_MESSAGE })
+        })
+    })
+
+  router.get('/files/:glob', (req: any, res: any) => {})
+
+  /**
+   * concern: should uploaded media + submitted text files have same route?
+   * POST /file/:relPath
+   *  type= 'infer'
+   *
+   *
+   */
   router.post('/upload', uploader.single('file'), (req: any, res: any) => {
     try {
       const fileName = req.file.originalname
@@ -297,32 +341,6 @@ export function router(config: GitRouterConfig = {}) {
       // TODO: More intelligently respond
       res.status(500)
       res.json({ status: 'failure', message: GIT_ERROR_MESSAGE })
-    }
-  })
-
-  router.get('/show/:fileRelativePath', async (req, res) => {
-    try {
-      const fileRelativePath = path.posix
-        .join(CONTENT_REL_PATH, req.params.fileRelativePath)
-        .replace(/^\/*/, '')
-
-      const content = await show({
-        pathRoot: REPO_ABSOLUTE_PATH,
-        fileRelativePath,
-      })
-
-      res.json({
-        fileRelativePath: req.params.fileRelativePath,
-        content,
-        status: 'success',
-      })
-    } catch {
-      res.status(501)
-      res.json({
-        status: 'failure',
-        message: GIT_ERROR_MESSAGE,
-        fileRelativePath: req.params.fileRelativePath,
-      })
     }
   })
 
