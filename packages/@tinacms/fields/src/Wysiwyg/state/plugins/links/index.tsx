@@ -17,33 +17,50 @@ limitations under the License.
 */
 
 import { Fragment, Node, Schema, Slice } from 'prosemirror-model'
-import { Plugin, Transaction } from 'prosemirror-state'
-import { LinkFormController } from './LinkFormController'
+import { Plugin, Transaction, PluginKey, EditorState } from 'prosemirror-state'
 import { LinkView } from './LinkView'
+import { markExtend } from '../../../commands/link-commands'
 
 export const HTTP_LINK_REGEX = /\bhttps?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:;%_\+.,~#?&//=]*)/g
 
-export function links(schema: Schema, theme?: any): Plugin {
-  const renderTarget = createInvisibleDiv('links')
-  let linkForm: LinkFormController
+interface LinkPluginState {
+  showLinkForm: boolean
+}
+
+export const linkPluginKey = new PluginKey('image')
+
+export function links(schema: Schema): Plugin {
   let shiftKey: boolean
   return new Plugin({
-    filterTransaction(tr: Transaction): boolean {
-      switch (tr.getMeta('type')) {
-        case 'tinacms/render':
-          linkForm.render(tr.getMeta('clickTarget'))
-          return false
-        case 'tinacms/unmount':
-          linkForm.unmount()
-          return false
-        default:
-          return true
-      }
+    key: linkPluginKey,
+    state: {
+      init: () => {
+        return { clickTarget: undefined }
+      },
+      apply(
+        tr: Transaction,
+        prev: LinkPluginState,
+        _: EditorState,
+        state: EditorState
+      ) {
+        if (tr.getMeta('type') === 'tinacms/render') {
+          const { $head } = state.selection
+          const { link } = state.schema.marks
+          return {
+            clickTarget: tr.getMeta('clickTarget'),
+            linkMark: markExtend($head, link),
+          }
+        }
+        if (tr.getMeta('type') === 'tinacms/unmount') {
+          return {
+            clickTarget: undefined,
+          }
+        }
+        return prev
+      },
     },
     view(editorView: any) {
-      insertElBefore(renderTarget, editorView.dom)
-      linkForm = new LinkFormController(renderTarget, editorView as any, theme)
-      return new LinkView(editorView as any, schema, renderTarget)
+      return new LinkView(editorView as any, schema)
     },
     props: {
       transformPasted(slice: Slice): Slice {

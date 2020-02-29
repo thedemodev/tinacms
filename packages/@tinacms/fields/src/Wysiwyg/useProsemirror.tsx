@@ -40,7 +40,6 @@ export interface Input {
 export function useProsemirror(
   input: Input,
   plugins: Plugin[] = [],
-  theme?: any,
   format?: Format
 ) {
   /**
@@ -68,7 +67,7 @@ export function useProsemirror(
    * CreateState
    */
   const createState = React.useCallback((value: string) => {
-    return createEditorState(schema, translator, plugins, value, theme)
+    return createEditorState(schema, translator, plugins, value)
   }, [])
 
   /**

@@ -32,8 +32,7 @@ export class LinkView {
 
   constructor(
     public view: EditorView,
-    public schema: Schema,
-    public renderTarget: HTMLElement
+    public schema: Schema // public renderTarget: HTMLElement
   ) {
     document.addEventListener('click', this.handleClick)
     window.addEventListener('resize', this.unmountLinkForm)
@@ -42,7 +41,6 @@ export class LinkView {
   destroy = (): void => {
     document.removeEventListener('click', this.handleClick)
     window.removeEventListener('resize', this.unmountLinkForm)
-    this.renderTarget.parentElement!.removeChild(this.renderTarget)
   }
 
   handleClick = (e: MouseEvent) => {
@@ -50,7 +48,7 @@ export class LinkView {
     const clickedInsideEditor = this.view.dom.contains(eventTarget)
     const clickedLink = this.isValidLink(eventTarget)
 
-    if (this.shouldStopEditing(eventTarget)) {
+    if (this.shouldStopEditing()) {
       stopEditingLink(this.view.state, this.view.dispatch)
     }
 
@@ -66,8 +64,8 @@ export class LinkView {
     }
   }
 
-  shouldStopEditing(eventTarget: Element) {
-    const clickedInsideOverlay = this.renderTarget.contains(eventTarget)
+  shouldStopEditing() {
+    // const clickedInsideOverlay = this.renderTarget.contains(eventTarget)
     const creatingNewLink =
       this.linkBeingEdited &&
       this.linkBeingEdited.getAttribute('creating') === 'creating'
@@ -76,9 +74,7 @@ export class LinkView {
 
     this.skippedLinkControlClick = !!creatingNewLink
 
-    return (
-      this.visible && !clickedInsideOverlay && !firstClickAfterCreatingNewLink
-    )
+    return this.visible && !firstClickAfterCreatingNewLink
   }
 
   /**

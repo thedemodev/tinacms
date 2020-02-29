@@ -47,6 +47,7 @@ import {
 } from '@tinacms/icons'
 import { radius, color, padding } from '@tinacms/styles'
 import { MenuPortalProvider, useMenuPortal } from './MenuPortal'
+import { FloatingLinkForm } from '../links/FloatingLinkForm'
 
 // import { ImageControl } from './images'
 
@@ -181,6 +182,7 @@ export const Menu = (props: Props) => {
         </MenuWrapper>
         <FloatingTableMenu editorView={editorView} />
         <ImageMenu editorView={editorView} />
+        <FloatingLinkForm editorView={editorView} />
       </>
     </ThemeProvider>
   )

@@ -18,7 +18,7 @@ limitations under the License.
 
 import { EditorView } from 'prosemirror-view'
 import * as React from 'react'
-import { render, unmountComponentAtNode } from 'react-dom'
+import { createRef, useState, useEffect } from 'react'
 
 import { LinkForm } from './LinkForm'
 import {
@@ -27,41 +27,57 @@ import {
   updateLinkBeingEdited,
 } from '../../../commands'
 import { findElementOffsetTop, findElementOffsetLeft } from '../../../utils'
-import styled, { ThemeProvider } from 'styled-components'
+import styled from 'styled-components'
 import { TinaReset } from '@tinacms/styles'
+import { linkPluginKey } from './index'
 
-export class LinkFormController {
-  clickTarget: HTMLElement | null = null
+const width = 240
 
-  constructor(
-    protected renderTarget: HTMLElement,
-    protected view: EditorView,
-    protected theme?: any
-  ) {
-    //
+export const FloatingLinkForm = ({
+  editorView,
+}: {
+  editorView: { view: EditorView }
+}) => {
+  const { view } = editorView
+  const linkPluginState = linkPluginKey.getState(view.state)
+
+  const onChange = (attrs: any) => {
+    updateLinkBeingEdited(view.state, view.dispatch, linkPluginState.linkMark, {
+      ...attrs,
+      editing: '',
+      creating: '',
+    })
   }
 
-  render = (link: HTMLElement) => {
-    this.clickTarget = link
-    render(this.component(), this.renderTarget)
-  }
+  const [position, setPosition] = useState<any>(undefined)
+  const wrapperRef = createRef<any>()
 
-  unmount = () => unmountComponentAtNode(this.renderTarget)
-
-  component(): any {
-    if (!this.clickTarget) return
-    const minWidth = 240
-    const left = calcLeftOffset(this.clickTarget!, this.renderTarget, minWidth)
-    const top = `calc(32px + ${findElementOffsetTop(this.clickTarget) -
-      findElementOffsetTop(this.renderTarget)}px)`
+  useEffect(() => {
+    const { clickTarget } = linkPluginState
+    if (!clickTarget || !wrapperRef.current) {
+      setPosition(undefined)
+      return
+    }
+    const left = calcLeftOffset(clickTarget!, wrapperRef.current, width)
+    const top = `calc(32px + ${findElementOffsetTop(clickTarget) -
+      findElementOffsetTop(wrapperRef.current)}px)`
     const arrowOffset = calcArrowLeftOffset(
-      this.clickTarget!,
-      this.renderTarget,
-      minWidth
+      clickTarget,
+      wrapperRef.current,
+      width
     )
+    setPosition({ arrowOffset, left, top })
+  }, [linkPluginState])
 
-    return (
-      <ThemeProvider theme={this.theme}>
+  if (!linkPluginState.clickTarget) return null
+
+  const { arrowOffset, left, top } = position || {}
+  const { href, title } = linkPluginState.linkMark.mark.attrs
+  const { state, dispatch } = view
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'absolute' }}>
+      {position && (
         <TinaReset>
           <LinkFormWrapper>
             <LinkArrow offset={arrowOffset} top={top}></LinkArrow>
@@ -69,39 +85,21 @@ export class LinkFormController {
               style={{
                 left,
                 top,
-                minWidth: `${minWidth}px`,
+                width: `${width}px`,
               }}
-              removeLink={this.removeLink}
-              onChange={this.onChange}
-              href={this.href}
-              title={this.title}
-              cancel={this.cancel}
+              removeLink={() =>
+                removeLinkBeingEdited(state, dispatch, linkPluginState.linkMark)
+              }
+              onChange={onChange}
+              href={href}
+              title={title}
+              cancel={() => stopEditingLink(state, dispatch)}
             />
           </LinkFormWrapper>
         </TinaReset>
-      </ThemeProvider>
-    )
-  }
-
-  get href() {
-    return this.clickTarget!.getAttribute('href')
-  }
-
-  get title() {
-    return this.clickTarget!.getAttribute('title')
-  }
-
-  cancel = () => stopEditingLink(this.view.state, this.view.dispatch)
-
-  removeLink = () => removeLinkBeingEdited(this.view.state, this.view.dispatch)
-
-  onChange = (attrs: any) => {
-    updateLinkBeingEdited(this.view.state, this.view.dispatch, {
-      ...attrs,
-      editing: '',
-      creating: '',
-    })
-  }
+      )}
+    </div>
+  )
 }
 
 const LinkFormWrapper = styled.div`

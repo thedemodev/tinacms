@@ -20,7 +20,7 @@ import { Mark, MarkType, ResolvedPos } from 'prosemirror-model'
 import { EditorState } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
 
-type Dispatch = typeof EditorView.prototype.dispatch;
+type Dispatch = typeof EditorView.prototype.dispatch
 
 export function renderLinkForm(view: EditorView, link: Element) {
   const tr = view.state.tr
@@ -48,6 +48,7 @@ export function insertLinkToFile(
 }
 
 export function unmountLinkForm(view: EditorView) {
+  console.log('into unmountLinkForm')
   const tr = view.state.tr
   tr.setMeta('type', 'tinacms/unmount')
   view.dispatch(tr)
@@ -60,7 +61,10 @@ export function unmountLinkForm(view: EditorView) {
  * @param {EditorState} state
  * @param {(tr: Transaction) => void} dispatch
  */
-export function startEditingLink(state: EditorState, dispatch: Dispatch | null) {
+export function startEditingLink(
+  state: EditorState,
+  dispatch: Dispatch | null
+) {
   const linkMarkType = state.schema.marks['link']
 
   const $cursor: ResolvedPos = (state.selection as any).$cursor
@@ -71,7 +75,9 @@ export function startEditingLink(state: EditorState, dispatch: Dispatch | null) 
   if (!node || !linkMarkType.isInSet(node.marks)) return false
 
   if (dispatch) {
-    const { from, to, mark } = markExtend($cursor, linkMarkType)
+    const markExt = markExtend($cursor, linkMarkType)
+    if (!markExt) return false
+    const { from, to, mark } = markExt
     const attrs = {
       ...(mark ? mark.attrs : {}),
       editing: 'editing',
@@ -86,7 +92,7 @@ export function startEditingLink(state: EditorState, dispatch: Dispatch | null) 
 
 declare let window: any
 
-function markExtend($cursor: ResolvedPos, markType: MarkType) {
+export function markExtend($cursor: ResolvedPos, markType: MarkType) {
   window.$cursor = $cursor
   let startIndex = $cursor.index()
   let endIndex = $cursor.indexAfter()
@@ -98,6 +104,7 @@ function markExtend($cursor: ResolvedPos, markType: MarkType) {
   }
 
   const mark = markType.isInSet($cursor.parent.child(startIndex).marks)
+  if (!mark) return
   // TODO: This might be a problem.
   const hasMark = (index: number) =>
     mark!.isInSet($cursor.parent.child(index).marks)
@@ -170,43 +177,28 @@ export function stopEditingLink(state: EditorState, dispatch: Dispatch | null) {
 export function updateLinkBeingEdited(
   state: EditorState,
   dispatch: Dispatch | null,
+  mark: any,
   attrs: object
 ) {
   if (dispatch) {
-    const linkMarkType = state.schema.marks['link']
-    const tr = state.tr
-
-    state.doc.descendants((node, i) => {
-      const linkMark = linkMarkType.isInSet(node.marks)
-
-      if (linkMark && linkMark.attrs.editing) {
-        const from = i
-        const to = from + node.nodeSize
-        tr.addMark(from, to, linkMarkType.create(attrs))
-      }
-    })
-
-    dispatch(tr.scrollIntoView())
+    const linkMarkType = state.schema.marks.link
+    if (mark)
+      dispatch(state.tr.addMark(mark.from, mark.to, linkMarkType.create(attrs)))
   }
   return true
 }
 
-export function removeLinkBeingEdited(state: EditorState, dispatch: Dispatch | null) {
+export function removeLinkBeingEdited(
+  state: EditorState,
+  dispatch: Dispatch | null,
+  mark: any
+) {
   if (dispatch) {
-    const linkMarkType = state.schema.marks['link']
-    const tr = state.tr
-
-    state.doc.descendants((node, i) => {
-      const linkMark = linkMarkType.isInSet(node.marks)
-
-      if (linkMark && linkMark.attrs.editing) {
-        const from = i
-        const to = from + node.nodeSize
-        tr.removeMark(from, to, linkMark)
-      }
-    })
-
-    dispatch(tr.scrollIntoView())
+    if (mark) {
+      dispatch(
+        state.tr.removeMark(mark.from, mark.to, mark.mark).scrollIntoView()
+      )
+    }
   }
   return true
 }
